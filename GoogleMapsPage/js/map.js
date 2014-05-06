@@ -16,7 +16,7 @@ function Map() {
 	this.units = {}; // Our units array
 	
 	// Sets or updates a unit
-	this.unit = function(map, data) {
+	this.unit = function(map, data, instruments) {
 		// Checks if we have data
 		if (map != undefined && data != undefined)
 		{

@@ -1,0 +1,57 @@
+<!doctype html>
+<html>
+<head>
+	<link type="text/css" rel="stylesheet" href="css/instruments.css">
+</head>
+<body>
+
+    <div id="instruments">
+        <span id="attitude"></span>
+        <span id="heading"></span>
+        <span id="variometer"></span>
+        <span id="airspeed"></span>
+        <span id="altimeter"></span>
+    </div>
+
+    <script src="http://ajax.googleapis.com/ajax/libs/jquery/2.1.0/jquery.min.js"></script>
+	<script src="http://code.xrtml.org/xrtml-3.2.0.js"></script>
+    <script src="js/jquery.flightindicators.js"></script>
+    <script src="js/unit.js"></script>
+    <script src="js/instruments.js"></script>
+	<script>
+        var appkey = 'APPLICATION_KEY';
+        var url = 'http://ortc-developers.realtime.co/server/2.1';
+        var authToken = 'AUTHENTICATION_TOKEN';
+        var channel = 'fsx:session1';
+        var instruments = new Instruments();
+
+        // Flight indicators
+        var indicators = {
+            attitude: $.flightIndicator('#attitude', 'attitude', {roll:50, pitch:-20, size:200, showBox : true}),
+            heading : $.flightIndicator('#heading', 'heading', {heading:150, showBox:true}),
+            variometer: $.flightIndicator('#variometer', 'variometer', {vario:0, showBox:true}),
+            airspeed: $.flightIndicator('#airspeed', 'airspeed', {showBox: false}),
+            altimeter:  $.flightIndicator('#altimeter', 'altimeter')
+        }
+
+        xRTML.load(function(){
+
+            xRTML.Config.debug = true;
+
+            xRTML.ConnectionManager.create({
+                id: 'myConn',
+                appkey: appkey,
+                authToken: authToken,
+                url: url,
+                channels: [
+                {name: channel}
+                ]
+            }).bind({
+                message: function(e) {
+                    instruments.update(xRTML.JSON.parse(e.message), indicators);
+            	}
+    		});
+	    });
+    </script>
+</body>
+</html>

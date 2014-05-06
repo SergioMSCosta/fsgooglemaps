@@ -15,6 +15,7 @@ using Ibt.Ortc.Api.Extensibility;
 using Ibt.Ortc.Plugin.IbtRealTimeSJ;
 using FSUIPC;
 using System.Globalization;
+using Newtonsoft;
 
 namespace FSGoogleMaps
 {
@@ -39,6 +40,11 @@ namespace FSGoogleMaps
         private Offset<uint> playerHeadingTrue = new Offset<uint>(0x0580); // Offset for the heading
         private Offset<long> playerAltitude = new Offset<long>(0x0570); // Offset for the altitude
         private Offset<short> slewMode = new Offset<short>(0x05DC); // Offset for indicating if we are in slew mode
+        private Offset<int> playerPitch = new Offset<int>(0x0578); // Offset for pitch
+        private Offset<int> playerBank = new Offset<int>(0x057C); // Offset for bank
+        private Offset<short> playerAltimeterPressure = new Offset<short>(0x0330); // Offset for altimeter pressure
+        private Offset<int> playerVertSpeed = new Offset<int>(0x02C8); // Offset for vertical airspeed
+        
         #endregion
 
         #region Properties
@@ -250,30 +256,31 @@ namespace FSGoogleMaps
             FSUIPCConnection.Process(); // Process the request to FSUIPC
             FSUIPCConnection.Process("AircraftInfo"); // For aicraft type
 
-            int ias = (int)((double)airspeed.Value / 128d); // Aircraft speed (KIAS)
-            int hdg = (int)((double)(playerHeadingTrue.Value - magVar.Value) * 8.3819E-008d); // Heading
-            int alt = (int)(playerAltitude.Value * 3.28084 / (65536d * 65536d)); // Altitude (feet)
-            string acType = aircraftType.Value.ToString(); // Aircraft type ex.: Jetranger
-            int engType = (int)engineType.Value; // Engine type. Helicopters are usually type 3 but there are some exceptions (like the default Robinson)
-
-            // This will help us force the period as our decimal separator
-            NumberFormatInfo nfi = new NumberFormatInfo();
-            nfi.NumberDecimalSeparator = ".";
-            nfi.NumberGroupSeparator = ",";
-
             // Checks if we have data
             if (lat.DecimalDegrees != 0 || lon.DecimalDegrees != 0)
             {
-                // Build the JSON string
-                string data = string.Format(@"{{""id"": ""{0}"", ""type"": ""{1}"", ""icon"": ""{2}"", ""ias"": {3}, ""hdg"": {4}, ""lat"": {5}, ""lon"": {6}, ""alt"": {7}}}",
-                    1,
-                    acType,
-                    (engType == 3) ? "heli" : "fixed", // our icon will depend on the engine type. For simplicity sake, we're assuming helicopter are always type 3
-                    ias,
-                    hdg,
-                    lat.DecimalDegrees.ToString(nfi),
-                    lon.DecimalDegrees.ToString(nfi),
-                    alt);
+                // This will help us force the period as our decimal separator
+                NumberFormatInfo nfi = new NumberFormatInfo();
+                nfi.NumberDecimalSeparator = ".";
+                nfi.NumberGroupSeparator = ",";
+                
+                // Let's fill our player data object
+                PlayerData playerData = new PlayerData();
+                playerData.id = "Whatever"; // Set your own ID here v
+                playerData.lon = lon.DecimalDegrees.ToString(nfi);
+                playerData.lat = lat.DecimalDegrees.ToString(nfi);
+                playerData.ias = (int)((double)airspeed.Value / 128d); // Aircraft speed (KIAS)
+                playerData.hdg = (int)((double)(playerHeadingTrue.Value - magVar.Value) * 8.3819E-008d); // Heading
+                playerData.alt = (int)(playerAltitude.Value * 3.28084 / (65536d * 65536d)); // Altitude (feet)
+                playerData.type = aircraftType.Value.ToString(); // // our icon will depend on the engine type. For simplicity sake, we're assuming helicopter are always type 3
+                playerData.icon = (int)engineType.Value == 3 ? "heli" : "fixed"; // Engine type. Helicopters are usually type 3 but there are some exceptions (like the default Robinson)
+                playerData.pitch = (int)(playerPitch.Value * 8.3819E-008d);
+                playerData.bank = (int)(playerBank.Value * 8.3819E-008d);
+                playerData.altMb = (int)(playerAltimeterPressure.Value * 16);
+                playerData.vertAs = (int)(playerVertSpeed.Value * 60 * 3.28084 / 256);
+                
+                // And serialize it
+                string data = Newtonsoft.Json.JsonConvert.SerializeObject(playerData);
 
                 Log(string.Format("Sending data to ORTC: {0}", data)); // Log
                 ortcClient.Send(txtORTCChannel.Text, data); // Sends the data to ORTC
